@@ -38,7 +38,7 @@ Wrist3: 0
 roslaunch rpi_ati_net_ft ati_net_ft_driver.launch
 
 ### 3.Run this:
-rosrun ur_robot_driver error_for_force_revised.py
+rosrun ur_robot_driver error_for_force_revised.py <br>
 This will whether the Force Torque sensor is calibrated or not.
 
 ### 4.This will give Euler angles in radians (which will be used for the calibration of the haptic device tip with ur3e end effector):
@@ -46,17 +46,17 @@ rosrun ur_robot_driver error_for_pose.py
 
 ### 5.To run the setup: 
 ### Run this on the master side :
-roslaunch aiims_teleop version1.launch
-Contents of the version1.launch(master side)
-1.version0_2_1_1.py
-2.final_haptic_camera_node_2.py
+roslaunch aiims_teleop version1.launch <br>
+Contents of the version1.launch(master side) <br>
+1.version0_2_1_1.py <br>
+2.final_haptic_camera_node_2.py <br>
 
 ### Run this on the slave side :
-roslaunch ur_robot_driver version1.launch
-Contents of version1_1.launch (slave side)
-1.version0_pose1.py
-2.version0_force_1.py
-3.camera_nod2_test1.py
+roslaunch ur_robot_driver version1.launch  <br>
+Contents of version1_1.launch (slave side) <br>
+1.version0_pose1.py  <br>
+2.version0_force_1.py <br>
+3.camera_nod2_test1.py <br>
 
 Then Press : play in Control Section in Run window in Teach Pendant.
 ### The whole setup will work perfectly.
