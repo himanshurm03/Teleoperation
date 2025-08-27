@@ -27,12 +27,12 @@ This repository contains the required codes and instructions to set up and run t
 
 Ensure the UR3e robot joints are initialized with the following positions (in degrees):
 
-Base: 0
-Shoulder: -90
-Elbow: -90
-Wrist1: -90
-Wrist2: 90
-Wrist3: 0
+Base: 0 <br>
+Shoulder: -90 <br>
+Elbow: -90 <br> 
+Wrist1: -90 <br>
+Wrist2: 90 <br>
+Wrist3: 0 <br>
 
 ### 2. Launch the Force Torque Sensor
 roslaunch rpi_ati_net_ft ati_net_ft_driver.launch
