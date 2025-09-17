@@ -39,15 +39,15 @@ roslaunch rpi_ati_net_ft ati_net_ft_driver.launch
 
 ### 3.Run this:
 rosrun ur_robot_driver error_for_force_revised.py <br>
-This will whether the Force Torque sensor is calibrated or not.
+This will determine whether the Force-Torque sensor is calibrated or not.
 
-### 4.This will give Euler angles in radians (which will be used for the calibration of the haptic device tip with ur3e end effector):
+### 4.This provides Euler angles in radians, which are used to calibrate the haptic device tip with the UR3e end effector:
 rosrun ur_robot_driver error_for_pose.py
 
 ### 5.To run the setup: 
 ### Run this on the master side :
 roslaunch aiims_teleop version1.launch<br>
-###Contents of the version1.launch(master side) <br>
+Contents of the version1.launch(master side) <br>
 1.version0_2_1_1.py <br>
 2.final_haptic_camera_node_2.py <br>
 
