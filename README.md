@@ -9,8 +9,8 @@ Teleoperation framework integrating a Geomagic Touch haptic device with a UR3e r
 - ✅ Camera integration for live video streaming
 
 ## ⚙️ Requirements
-- **ROS Noetic**  
-- **Python 3**  
+- ROS Noetic  
+- Python 3  
 - UR3e robot with ROS driver  
 - Geomagic Touch with OpenHaptics SDK  
 - Ubuntu 20.04 (Tested)
@@ -46,6 +46,7 @@ rosrun ur_robot_driver error_for_pose.py
 
 ### 5.To run the setup: 
 ### Run this on the master side :
+```bash
 roslaunch aiims_teleop version1.launch <br>
 Contents of the version1.launch(master side) <br>
 1.version0_2_1_1.py <br>
