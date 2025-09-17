@@ -47,7 +47,7 @@ rosrun ur_robot_driver error_for_pose.py
 ### 5.To run the setup: 
 ### Run this on the master side :
 ```bash
-roslaunch aiims_teleop version1.launch <br>
+roslaunch aiims_teleop version1.launch # <br>
 Contents of the version1.launch(master side) <br>
 1.version0_2_1_1.py <br>
 2.final_haptic_camera_node_2.py <br>
