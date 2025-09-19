@@ -19,6 +19,7 @@ class RobotEndEffectorController:
         self.last_received_master_timestamp = None
         self.last_received_master_force_timestamp = None
         self.start_time = rospy.get_time()
+        self.packet_times = [] 
 
 
 
@@ -27,7 +28,7 @@ class RobotEndEffectorController:
         self.time_back_to_master_pose_pub = rospy.Publisher('time_from_slave_to_master_for_pose', Float64, queue_size=1)
         self.time_back_to_master_force_pub = rospy.Publisher('time_from_slave_to_master_for_force', Float64, queue_size=1)
         self.haptic_timestamps = []
-        #self.time_pub = rospy.Publisher('time_from_slave_to_master_for_pose', Float64, queue_size=1)
+        #self.time_pub = rospy.Publisher('time_from_slave_to_master_for_pose', Float64, queue_size=1, tcp_nodelay=True)
         self.time_pub = rospy.Publisher('time_from_slave_to_master_for_pose', Float64, queue_size=10)
 
         
@@ -176,7 +177,7 @@ class RobotEndEffectorController:
 
         J_geometrical = self.Jointspace2GeometricJacobian(self.joint_position_robot)
 
-        c = 8
+        c = 8  #Original c ws 8
         k = np.array([[c, 0, 0, 0, 0, 0],
                       [0, c, 0, 0, 0, 0],
                       [0, 0, c, 0, 0, 0],
@@ -272,12 +273,16 @@ class RobotEndEffectorController:
     #         self.time_pub.publish(Float64(self.last_received_master_timestamp))
 
     #     return self.haptic_stylus_position
-
+ 
+##THIS IS THE ORIGINAL HAPTIC CALLBACK FUNCTION
+ 
     def haptic_callback(self, msg: PoseStamped):
     # --- Store and forward header timestamp from master ---
         timestamp = msg.header.stamp.to_sec()
         self.haptic_timestamps.append(timestamp)
 
+# New line
+        self.last_packet_received_time = rospy.get_time()
     # Publish the same timestamp back to master for delay logging
         self.time_pub.publish(Float64(timestamp))
 
@@ -310,6 +315,9 @@ class RobotEndEffectorController:
         self.haptic_stylus_position = haptic_stylus_position - self.haptic_stylus_initial_position
 
         return self.haptic_stylus_position
+## ABOVE IS THE ORIGINAL HAPTIC CALL BACK FUNCTION
+ 
+
 
     @staticmethod
     def haptic_quat2rpy(quaternion):
@@ -325,6 +333,13 @@ class RobotEndEffectorController:
     def velocity_callback(self, event):
         velocity_pub_msg = Float64MultiArray()
         velocity_pub_msg.data = self.rpy2joint_space_vel()
+        applied_time = rospy.get_time()
+        if hasattr(self, "last_packet_received_time"):
+            diff = applied_time - self.last_packet_received_time
+            self.packet_times.append((
+                self.last_packet_received_time, 
+                applied_time, 
+                diff))
         self.velocity_pub.publish(velocity_pub_msg)
 
     def plot_error_data(self):
@@ -565,12 +580,43 @@ class RobotEndEffectorController:
                 ])
 
 
+    # def make_csv_packet_times(self):
+    # # Convert to numpy for easier handling
+    #     packet_times = np.array(self.packet_times)  # list of (received, applied, diff)
 
+    #     with open('/home/user/Desktop/delay/pose_processing.csv', 'w', newline='') as csvfile:
+    #         csvwriter = csv.writer(csvfile)
+    #         csvwriter.writerow(['Received_Time', 'Applied_Time', 'Difference'])
+
+    #         for i in range(len(packet_times)):
+    #             csvwriter.writerow([
+    #                 packet_times[i][0],   # Received_Time
+    #                 packet_times[i][1],   # Applied_Time
+    #                 packet_times[i][2]    # Difference
+    #             ])
+    
+    def make_csv_packet_times(self):
+        with open('/home/user/Desktop/delay/pose_processing.csv', 'w', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(['Received_Time', 'Applied_Time', 'Difference'])
+
+            for received, applied, diff in self.packet_times:
+                csvwriter.writerow([received, applied, diff])
 
     def main_loop(self):
         rate = 500
         rospy.Timer(rospy.Duration(1.0/rate),self.velocity_callback)
         rospy.spin()
+
+# if __name__ == "__main__":
+#     try:
+#         controller = RobotEndEffectorController()
+#         controller.main_loop()
+#     except rospy.ROSInterruptException:
+#         pass
+#     finally:
+#         controller.make_csv()
+#         controller.make_csv_packet_times()
 
 if __name__ == "__main__":
     try:
@@ -579,7 +625,16 @@ if __name__ == "__main__":
     except rospy.ROSInterruptException:
         pass
     finally:
-        controller.make_csv()
+        try:
+            controller.make_csv()
+        except Exception as e:
+            rospy.logerr(f"Failed to save pose.csv: {e}")
+
+        try:
+            controller.make_csv_packet_times()
+        except Exception as e:
+            rospy.logerr(f"Failed to save pose_processing.csv: {e}")
+
         #controller.plot_error_data()
         #controller.plot_data()
         #controller.plot_planes()
