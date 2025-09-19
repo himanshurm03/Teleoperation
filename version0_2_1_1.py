@@ -19,6 +19,7 @@ class MasterController:
         self.force_delay_entries = []
         self.pose_pub_timestamps = []
         self.pose_gen_send_log = []
+        self.force_receive_log = []
         self.latest_pose_msg = None
 
 
@@ -67,9 +68,16 @@ class MasterController:
         self.pose_delays.append(delay)
         self.pose_delay_entries.append((msg.data, delay)) 
 
+    # def force_from_slave_to_master_callback(self, msg: OmniFeedback):
+    #     if not self.shutdown_flag:
+    #         self.force_pub.publish(msg)
     def force_from_slave_to_master_callback(self, msg: OmniFeedback):
         if not self.shutdown_flag:
-            self.force_pub.publish(msg)
+            receive_time = rospy.get_time()  # when received from slave
+            self.force_pub.publish(msg)      # existing logic (send to haptic device)
+            applied_time = rospy.get_time()  # when applied to device
+            diff = applied_time - receive_time
+            self.force_receive_log.append((receive_time, applied_time, diff))
 
     def pose_from_master_to_slave_callback(self, msg: PoseStamped):
         current_time = rospy.get_time()
@@ -113,6 +121,18 @@ class MasterController:
         except Exception as e:
             rospy.logerr(f"Failed to write pose gen→send log to CSV: {e}")
 
+    def save_force_receive_to_csv(self, filepath="/home/autonomous-lab/Desktop/delay/force_processing.csv"):
+        try:
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            with open(filepath, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(['Receive Time', 'Applied Time', 'Difference (s)'])
+                for recv, applied, diff in self.force_receive_log:
+                    writer.writerow([f"{recv:.9f}", f"{applied:.9f}", f"{diff:.9f}"])
+            rospy.loginfo(f"Force receive log saved to: {filepath}")
+        except Exception as e:
+            rospy.logerr(f"Failed to write force receive log to CSV: {e}")
+
 
 
     def shutdown_hook(self):
@@ -132,14 +152,14 @@ class MasterController:
         self.save_delays_to_csv()
         self.save_pose_pub_timestamps_to_csv()
         self.save_pose_gen_send_to_csv()
-
+        self.save_force_receive_to_csv()
 
 
 #     def main_loop(self):
 #         rospy.spin()
 
     def main_loop(self):
-        rate = rospy.Rate(500)  # 500 Hz
+        rate = rospy.Rate(1000)  # 500 Hz
         while not rospy.is_shutdown():
             if self.latest_pose_msg is not None:
                 gen_time = self.latest_pose_msg.header.stamp.to_sec()
