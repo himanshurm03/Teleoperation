@@ -35,7 +35,11 @@ class HapticForceController:
         self.joint_position_robot = np.zeros(6)
         self.haptic_force = np.zeros(3)
         
-        self.force_sent_timestamps = [] 
+        
+        self.force_sent_timestamps = []   # just sent times
+        self.force_gen_send_log = []      # gen_time, sent_time, diff for force_gen_send.csv
+        self.sent_force_times = {}
+
 
         # For moving average filter
         self.haptic_window_size = 100
@@ -64,14 +68,26 @@ class HapticForceController:
     #     self.delay_log.append(delay)
     #     self.delay_data_log.append((received_time, delay))
 
-    def time_from_master_to_slave_for_force_callback(self, msg: Float64):
-    # msg.data is the timestamp originally sent by the slave
-        if self.last_sent_force_timestamp is not None and msg.data == self.last_sent_force_timestamp:
-            round_trip_delay = rospy.get_time() - msg.data
-            print(f"[FORCE DELAY] Round-trip delay: {round_trip_delay:.6f} s")
+    # def time_from_master_to_slave_for_force_callback(self, msg: Float64):
+    # # msg.data is the timestamp originally sent by the slave
+    #     if self.last_sent_force_timestamp is not None and msg.data == self.last_sent_force_timestamp:
+    #         round_trip_delay = rospy.get_time() - msg.data
+    #         print(f"[FORCE DELAY] Round-trip delay: {round_trip_delay:.6f} s")
 
-            self.delay_log.append(round_trip_delay)
-            self.delay_data_log.append((msg.data, round_trip_delay))
+    #         self.delay_log.append(round_trip_delay)
+    #         self.delay_data_log.append((msg.data, round_trip_delay))
+
+    def time_from_master_to_slave_for_force_callback(self, msg: Float64):
+        sent_ts = msg.data
+        if sent_ts in self.sent_force_times:
+            rtd = rospy.get_time() - sent_ts
+            print(f"[FORCE DELAY] Round-trip delay: {rtd:.6f} s")
+
+            self.delay_log.append(rtd)
+            self.delay_data_log.append((sent_ts, rtd))
+
+            # cleanup to avoid memory growth
+            del self.sent_force_times[sent_ts]
 
     def update_list(self):
         if self.shutdown_flag:
@@ -154,31 +170,65 @@ class HapticForceController:
     #     self.last_sent_force_timestamp = time_msg.data
     #     self.time_pub.publish(time_msg)
 
+    # def haptic_force_callback(self, event):
+    #     if self.shutdown_flag:
+    #         return
+
+    # # Prepare and publish haptic force
+    #     force_pub_msg = OmniFeedback()
+    #     robot_force = self.forcevector_conversion(self.joint_position_robot, self.robot_force)
+    #     force_pub_msg.force.x, force_pub_msg.force.y, force_pub_msg.force.z = robot_force
+    #     self.force_pub.publish(force_pub_msg)
+
+    # # --- NEW LOGGING FOR TIMESTAMPS ---
+    #     gen_time = time.time()                # wall-clock generation time
+    #     time_msg = Float64()
+    #     time_msg.data = rospy.get_time()      # ROS time (sent timestamp)
+
+    #     self.last_sent_force_timestamp = time_msg.data
+    #     self.time_pub.publish(time_msg)
+        
+    # # Store both for CSV logging
+    #     self.force_sent_timestamps.append(time_msg.data)  # clean float
+    #     diff = time_msg.data - gen_time
+    #     self.force_gen_send_log.append((gen_time, time_msg.data, diff))
+
+    # # Store haptic force for plotting/logging
+    #     self.haptic_force = np.array([force_pub_msg.force.x, force_pub_msg.force.y, force_pub_msg.force.z])
+
+    # # Update plots and lists
+    #     self.update_list()
+
     def haptic_force_callback(self, event):
         if self.shutdown_flag:
             return
 
-    # Prepare and publish haptic force
+        # Prepare and publish haptic force
         force_pub_msg = OmniFeedback()
         robot_force = self.forcevector_conversion(self.joint_position_robot, self.robot_force)
         force_pub_msg.force.x, force_pub_msg.force.y, force_pub_msg.force.z = robot_force
         self.force_pub.publish(force_pub_msg)
 
-    # Prepare and publish timestamp (only once)
+        # --- LOGGING FOR TIMESTAMPS ---
+        gen_time = time.time()                # wall-clock generation time
         time_msg = Float64()
-        time_msg.data = rospy.get_time()
-        self.last_sent_force_timestamp = time_msg.data
+        time_msg.data = rospy.get_time()      # ROS time (sent timestamp)
+
+        # Save mapping for RTD lookup
+        self.sent_force_times[time_msg.data] = gen_time  
+
         self.time_pub.publish(time_msg)
 
-    # Store timestamp for CSV logging
+        # Store both for CSV logging
         self.force_sent_timestamps.append(time_msg.data)
+        diff = time_msg.data - gen_time
+        self.force_gen_send_log.append((gen_time, time_msg.data, diff))
 
-    # Store haptic force for plotting/logging
+        # Store haptic force for plotting/logging
         self.haptic_force = np.array([force_pub_msg.force.x, force_pub_msg.force.y, force_pub_msg.force.z])
 
-    # Update plots and lists
-        self.update_list()
-
+        # Update plots and lists
+        self.update_list()    
 
     def plot_data(self):
 
@@ -246,18 +296,19 @@ class HapticForceController:
     def make_csv(self):
         with open('/home/user/Desktop/delay/force.csv', 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
-        # Updated header: timestamp is now first
-            writer.writerow(['Timestamp Sent to Master', 'Time (s)', 
-                         'Robot Force X (N)', 'Robot Force Y (N)', 'Robot Force Z (N)',
-                         'Haptic Force X (N)', 'Haptic Force Y (N)', 'Haptic Force Z (N)'])
-
+            writer.writerow([
+                'Timestamp Sent to Master', 'Time (s)',
+                'Robot Force X (N)', 'Robot Force Y (N)', 'Robot Force Z (N)',
+                'Haptic Force X (N)', 'Haptic Force Y (N)', 'Haptic Force Z (N)'
+            ])
             for i in range(len(self.time_stamps)):
                 ts_sent = self.force_sent_timestamps[i] if i < len(self.force_sent_timestamps) else ''
                 writer.writerow([
-                ts_sent,  # Now first column
-                self.time_stamps[i], 
-                self.robot_force_plot[i][0], self.robot_force_plot[i][1], self.robot_force_plot[i][2],
-                self.haptic_force_plot[i][0], self.haptic_force_plot[i][1], self.haptic_force_plot[i][2]])
+                    f"{ts_sent:.9f}" if ts_sent != '' else '',
+                    f"{self.time_stamps[i]:.9f}",
+                    self.robot_force_plot[i][0], self.robot_force_plot[i][1], self.robot_force_plot[i][2],
+                    self.haptic_force_plot[i][0], self.haptic_force_plot[i][1], self.haptic_force_plot[i][2]
+                ])
 
                 
     def make_csv_for_delay(self):
@@ -267,6 +318,17 @@ class HapticForceController:
             for entry in self.delay_data_log:
                 writer.writerow([entry[0], entry[1]])
 
+    def make_csv_for_generation_and_send(self):
+        with open('/home/user/Desktop/delay/force_gen_send.csv', 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['Generation Time (s)', 'Sent Timestamp (ROS Time)', 'Difference (s)'])
+            for gen_time, sent_time, diff in self.force_gen_send_log:
+                writer.writerow([
+                    f"{gen_time:.9f}",
+                    f"{sent_time:.9f}",
+                    f"{diff:.9f}"
+                ])
+  
 
 
     def main_loop(self):
@@ -286,6 +348,7 @@ class HapticForceController:
         self.make_csv()
         #self.plot_data()
         self.make_csv_for_delay()
+        self.make_csv_for_generation_and_send() 
 
 if __name__ == "__main__":
     try:
